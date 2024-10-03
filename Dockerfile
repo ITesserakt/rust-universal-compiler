@@ -1,4 +1,4 @@
-FROM docker.io/library/rust:1.58.1-slim-bullseye
+FROM rustlang/rust:nightly-bullseye-slim
 
 LABEL name="Rust Universal Compiler Container"
 LABEL description="This container is designed to compile Rust projects for multiple targets."
@@ -46,16 +46,17 @@ RUN set -eux; \
     apt-get remove -y --auto-remove; \
     rm -rf /var/lib/apt/lists/*;
 
-# Retrieve the std lib for the target
-RUN rustup target add x86_64-pc-windows-msvc
+# Retrieve the std lib for the Windows and MacOS (M-series)
+RUN rustup target add x86_64-pc-windows-msvc aarch64-apple-darwin
 
 RUN set -eux; \
-    xwin_version="0.1.6"; \
+	xwin_version="0.6.5"; \
     xwin_prefix="xwin-$xwin_version-x86_64-unknown-linux-musl"; \
-    # Install xwin to cargo/bin via github release. Note you could also just use `cargo install xwin`.
-    curl --fail -L https://github.com/Jake-Shadle/xwin/releases/download/$xwin_version/$xwin_prefix.tar.gz | tar -xzv -C /usr/local/cargo/bin --strip-components=1 $xwin_prefix/xwin; \
+    # Install xwin to cargo/bin via cargo.
+    cargo install xwin --version "$xwin_version"; \
+    # curl --fail -L https://github.com/Jake-Shadle/xwin/releases/download/$xwin_version/$xwin_prefix.tar.gz | tar -xzv -C /usr/local/cargo/bin --strip-components=1 $xwin_prefix/xwin; \
     # Splat the CRT and SDK files to /xwin/crt and /xwin/sdk respectively
-    xwin --accept-license 1 splat --output /xwin; \
+    xwin --accept-license splat --output /xwin; \
     # Remove unneeded files to reduce image size
     rm -rf .xwin-cache /usr/local/cargo/bin/xwin;
 
@@ -104,18 +105,19 @@ RUN apt update && apt-get install -y \
         libssl-dev \
         patch \
         lzma-dev \
+        bzip2 \
         xz-utils
 
-# Add macOS Rust target
-RUN rustup target add x86_64-apple-darwin
+RUN set -eux; \
+	git clone https://github.com/tpoechtrager/osxcross; \
+	cd osxcross; \
+# Minimum version of MacOS that rust supports is 11.0
+# This don't work with higher versions (13.3+)
+	wget -nc https://github.com/alexey-lysiuk/macos-sdk/releases/download/11.3/MacOSX11.3.tar.bz2; \
+	mv MacOSX11.3.tar.bz2 tarballs/; \
+	UNATTENDED=yes OSX_VERSION_MIN=11.0 ./build.sh
 
-RUN git clone https://github.com/tpoechtrager/osxcross && \
-    cd osxcross && \
-    wget -nc https://s3.dockerproject.org/darwin/v2/MacOSX10.10.sdk.tar.xz && \
-    mv MacOSX10.10.sdk.tar.xz tarballs/ && \
-    UNATTENDED=yes OSX_VERSION_MIN=10.7 ./build.sh
-
-ENV PATH="/osxcross/target/bin:$PATH"
-ENV CC=o64-clang
-ENV CXX=o64-clang++
-ENV LIBZ_SYS_STATIC=1
+ENV PATH "/osxcross/target/bin:$PATH"
+ENV CC o64-clang
+ENV CXX o64-clang++
+ENV LIBZ_SYS_STATIC 1
