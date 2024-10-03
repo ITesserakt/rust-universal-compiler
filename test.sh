@@ -6,7 +6,7 @@ PROJECT_FOLDER="test-project"
 echo " [+] Building docker image"
 docker build -t $IMAGE_NAME .
 
-targets=( "x86_64-unknown-linux-gnu" "x86_64-apple-darwin" "x86_64-pc-windows-msvc" )
+targets=( "x86_64-unknown-linux-gnu" "aarch64-apple-darwin" "x86_64-pc-windows-msvc" )
 i=0
 len=${#targets[@]}
 while [ $i -lt $len ];
